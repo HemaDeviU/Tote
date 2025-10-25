@@ -59,14 +59,14 @@ export const ProductForm = () => {
       // In production, you might want to restrict to specific buyers
       const accs = createAccBuilder()
         .requireWalletOwnership(address) // For now, allow seller to decrypt
-        .on('base')
+        .on('base-sepolia')
         .build()
 
       // 3. Encrypt the product data
       const encryptedData = await litClient.encrypt({
         dataToEncrypt: JSON.stringify(productData),
         unifiedAccessControlConditions: accs,
-        chain: 'base',
+        chain: 'base-sepolia',
       })
 
       // 4. Upload encrypted data to IPFS
@@ -80,7 +80,7 @@ export const ProductForm = () => {
         ipfsHash,
         JSON.stringify(accs),
         formData.price,
-        '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' // Base USDC
+        '0x036CbD53842c5426634e7929541eC2318f3dCF7e' // Base Sepolia USDC
       )
 
       await tx.wait()

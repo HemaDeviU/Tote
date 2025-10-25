@@ -30,9 +30,9 @@ export const LitProvider = ({ children }: LitProviderProps) => {
 
   const initializeLit = async () => {
     try {
-      // Initialize Lit Client for Base chain
+      // Initialize Lit Client for Base Sepolia testnet
       const client = new LitClient({
-        litNetwork: 'cayenne', // Use 'manzano' for testnet
+        litNetwork: 'manzano', // Use 'manzano' for testnet
         debug: process.env.NODE_ENV === 'development'
       })
 
