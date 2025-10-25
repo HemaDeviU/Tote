@@ -385,9 +385,18 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @param _timeElapsed Time elapsed in seconds
      */
     function calculateYield(uint256 _amount, uint256 _timeElapsed) public view returns (uint256) {
+        if (_amount == 0 || _timeElapsed == 0) {
+            return 0;
+        }
+        
         // Calculate yield: amount * annualRate * timeElapsed / (365 days * 24 hours * 3600 seconds)
-        uint256 secondsInYear = 365 * 24 * 3600;
-        return (_amount * annualYieldRate * _timeElapsed) / (10000 * secondsInYear);
+        // Use higher precision to avoid rounding errors
+        uint256 secondsInYear = 365 * 24 * 3600; // 31,536,000 seconds
+        uint256 numerator = _amount * annualYieldRate * _timeElapsed;
+        uint256 denominator = 10000 * secondsInYear;
+        
+        // Add rounding for better precision
+        return (numerator + denominator / 2) / denominator;
     }
 
     /**
@@ -499,7 +508,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Get current yield rate from vault
+     * @dev Get current yield rate from vault (real-time)
      * @param _token Token address
      */
     function getCurrentYieldRate(address _token) external view returns (uint256) {
@@ -511,14 +520,39 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         try IERC4626(vaultAddress).totalAssets() returns (uint256 totalAssets) {
             try IERC4626(vaultAddress).totalSupply() returns (uint256 totalSupply) {
                 if (totalSupply > 0) {
-                    // Calculate APY: (totalAssets - totalSupply) / totalSupply * 365 days
-                    uint256 profit = totalAssets > totalSupply ? totalAssets - totalSupply : 0;
-                    return (profit * 365 * 24 * 3600 * 10000) / (totalSupply * 1); // Simplified calculation
+                    // Calculate real-time APY from vault performance
+                    // APY = (totalAssets / totalSupply - 1) * 10000 (in basis points)
+                    uint256 exchangeRate = (totalAssets * 10000) / totalSupply;
+                    if (exchangeRate > 10000) {
+                        return exchangeRate - 10000; // Return the yield portion
+                    }
                 }
             } catch {}
         } catch {}
         
         return annualYieldRate; // Fallback to simulated rate
+    }
+
+    /**
+     * @dev Calculate yield based on real-time vault performance
+     * @param _amount Amount to calculate yield for
+     * @param _timeElapsed Time elapsed in seconds
+     * @param _token Token address for vault lookup
+     */
+    function calculateRealTimeYield(uint256 _amount, uint256 _timeElapsed, address _token) public view returns (uint256) {
+        if (_amount == 0 || _timeElapsed == 0) {
+            return 0;
+        }
+        
+        // Get real-time yield rate from vault
+        uint256 currentRate = getCurrentYieldRate(_token);
+        
+        // Calculate yield using real-time rate
+        uint256 secondsInYear = 365 * 24 * 3600;
+        uint256 numerator = _amount * currentRate * _timeElapsed;
+        uint256 denominator = 10000 * secondsInYear;
+        
+        return (numerator + denominator / 2) / denominator;
     }
 
     // View functions
