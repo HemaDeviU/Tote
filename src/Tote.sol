@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -15,7 +15,8 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         address seller;
         string name;
         string description;
-        string ipfsHash; // IPFS hash for product data/files
+        string ipfsHash; // IPFS hash for encrypted product data/files
+        string accessControlConditions; // Lit Protocol access control conditions (JSON string)
         uint256 price;
         address paymentToken; // ERC20 token address for payment
         bool isActive;
@@ -52,6 +53,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         address indexed seller,
         string name,
         string ipfsHash,
+        string accessControlConditions,
         uint256 price,
         address paymentToken
     );
@@ -100,7 +102,8 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @dev List a new product on the marketplace
      * @param _name Product name
      * @param _description Product description
-     * @param _ipfsHash IPFS hash containing product data/files
+     * @param _ipfsHash IPFS hash containing encrypted product data/files
+     * @param _accessControlConditions Lit Protocol access control conditions (JSON string)
      * @param _price Price in the specified ERC20 token
      * @param _paymentToken Address of the ERC20 token for payment
      */
@@ -108,6 +111,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         string memory _name,
         string memory _description,
         string memory _ipfsHash,
+        string memory _accessControlConditions,
         uint256 _price,
         address _paymentToken
     ) external onlyAuthorizedToken(_paymentToken) {
@@ -123,6 +127,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
             name: _name,
             description: _description,
             ipfsHash: _ipfsHash,
+            accessControlConditions: _accessControlConditions,
             price: _price,
             paymentToken: _paymentToken,
             isActive: true,
@@ -131,7 +136,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
 
         sellerProducts[msg.sender].push(productId);
 
-        emit ProductListed(productId, msg.sender, _name, _ipfsHash, _price, _paymentToken);
+        emit ProductListed(productId, msg.sender, _name, _ipfsHash, _accessControlConditions, _price, _paymentToken);
     }
 
     /**
@@ -218,6 +223,20 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         require(purchase.ipfsShared, "IPFS link not shared yet");
 
         return products[purchase.productId].ipfsHash;
+    }
+
+    /**
+     * @dev Get access control conditions for a purchase (only accessible by buyer)
+     * @param _purchaseId ID of the purchase
+     */
+    function getAccessControlConditions(uint256 _purchaseId) external view returns (string memory) {
+        require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
+        
+        Purchase storage purchase = purchases[_purchaseId];
+        require(purchase.buyer == msg.sender, "Only buyer can access conditions");
+        require(purchase.ipfsShared, "IPFS link not shared yet");
+
+        return products[purchase.productId].accessControlConditions;
     }
 
     /**
@@ -310,5 +329,50 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      */
     function getTotalPurchases() external view returns (uint256) {
         return nextPurchaseId - 1;
+    }
+
+    /**
+     * @dev Get product and purchase data for Farcaster mini dapp integration
+     * @param _purchaseId Purchase ID
+     * @return product Product details
+     * @return purchase Purchase details
+     * @return canAccess Whether caller can access the encrypted content
+     */
+    function getProductAndPurchaseData(uint256 _purchaseId) 
+        external 
+        view 
+        returns (
+            Product memory product,
+            Purchase memory purchase,
+            bool canAccess
+        ) 
+    {
+        require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
+        
+        purchase = purchases[_purchaseId];
+        product = products[purchase.productId];
+        
+        // Check if caller is the buyer and IPFS has been shared
+        canAccess = (purchase.buyer == msg.sender && purchase.ipfsShared);
+        
+        return (product, purchase, canAccess);
+    }
+
+    /**
+     * @dev Get marketplace stats for Farcaster mini dapp
+     * @return totalProducts Total number of products
+     * @return totalPurchases Total number of purchases
+     * @return platformFee Current platform fee in basis points
+     */
+    function getMarketplaceStats() external view returns (
+        uint256 totalProducts,
+        uint256 totalPurchases,
+        uint256 platformFee
+    ) {
+        return (
+            nextProductId - 1,
+            nextPurchaseId - 1,
+            platformFeeBps
+        );
     }
 }
