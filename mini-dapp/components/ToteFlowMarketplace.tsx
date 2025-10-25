@@ -13,7 +13,7 @@ export const ToteFlowMarketplace = () => {
   const { disconnect } = useDisconnect()
   const { litClient, authManager, isInitialized } = useLit()
   
-  const [activeTab, setActiveTab] = useState<'browse' | 'list' | 'purchases'>('browse')
+  const [activeTab, setActiveTab] = useState<'browse' | 'list' | 'purchases' | 'yield'>('browse')
   const [isLitAuthenticated, setIsLitAuthenticated] = useState(false)
 
   // Check Lit authentication status
@@ -102,6 +102,16 @@ export const ToteFlowMarketplace = () => {
           >
             📦 My Purchases
           </button>
+          <button
+            onClick={() => setActiveTab('yield')}
+            className={`px-6 py-4 font-medium ${
+              activeTab === 'yield'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            💰 Yield Dashboard
+          </button>
         </div>
       </div>
 
@@ -110,6 +120,7 @@ export const ToteFlowMarketplace = () => {
         {activeTab === 'browse' && <ProductList />}
         {activeTab === 'list' && <ProductForm />}
         {activeTab === 'purchases' && <PurchaseHistory />}
+        {activeTab === 'yield' && <YieldDashboard />}
       </div>
     </div>
   )

@@ -93,6 +93,23 @@ export class ToteFlowContract {
     return await this.contract.getAccessControlConditions(purchaseId)
   }
 
+  // Yield functions
+  async withdrawYield(purchaseId: number) {
+    return await this.contract.withdrawYield(purchaseId)
+  }
+
+  async calculateYield(amount: string, timeElapsed: number) {
+    return await this.contract.calculateYield(amount, timeElapsed)
+  }
+
+  async getSellerYieldInfo(seller: string) {
+    return await this.contract.getSellerYieldInfo(seller)
+  }
+
+  async getPurchaseYield(purchaseId: number) {
+    return await this.contract.getPurchaseYield(purchaseId)
+  }
+
   // Helper function to get latest purchase ID for a buyer
   async getLatestPurchaseId(buyer: string): Promise<number> {
     const purchases = await this.getBuyerPurchases(buyer)

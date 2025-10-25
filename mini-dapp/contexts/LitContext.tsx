@@ -36,6 +36,8 @@ export const LitProvider = ({ children }: LitProviderProps) => {
         debug: process.env.NODE_ENV === 'development'
       })
 
+      await client.connect()
+
       // Initialize Auth Manager
       const auth = new AuthManager({
         litClient: client,
@@ -49,6 +51,8 @@ export const LitProvider = ({ children }: LitProviderProps) => {
           ]
         }
       })
+
+      await auth.init()
 
       setLitClient(client)
       setAuthManager(auth)
