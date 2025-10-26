@@ -519,7 +519,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         }
 
         // Get real-time yield rate from vault
-        uint256 currentRate = getCurrentYieldRate(_token);
+        uint256 currentRate = this.getCurrentYieldRate(_token);
 
         // Calculate yield using real-time rate
         uint256 secondsInYear = 365 * 24 * 3600;
