@@ -56,7 +56,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
     // State variables
     uint256 public nextProductId = 1;
     uint256 public nextPurchaseId = 1;
-    
+
     // Mappings
     mapping(uint256 => Product) public products;
     mapping(uint256 => Purchase) public purchases;
@@ -65,16 +65,16 @@ contract ToteFlow is Ownable, ReentrancyGuard {
     mapping(address => bool) public authorizedTokens; // Whitelist of accepted ERC20 tokens
     mapping(address => SellerYield) public sellerYields; // Seller yield tracking
     mapping(address => uint256) public totalYieldPool; // Total yield pool per token
-    
+
     // Platform fee (in basis points, e.g., 250 = 2.5%)
     uint256 public platformFeeBps = 250;
     address public feeRecipient;
-    
+
     // Yield configuration
     uint256 public yieldFeeBps = 2000; // 20% of yield goes to platform
     uint256 public annualYieldRate = 1000; // 10% annual yield (in basis points)
     address public yieldStrategy; // Address of yield farming strategy
-    
+
     // Real yield farming integration
     mapping(address => address) public yieldVaults; // token => vault address
     mapping(uint256 => uint256) public purchaseShares; // purchaseId => vault shares
@@ -90,7 +90,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         uint256 price,
         address paymentToken
     );
-    
+
     event ProductPurchased(
         uint256 indexed productId,
         uint256 indexed purchaseId,
@@ -99,17 +99,13 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         uint256 amountPaid,
         address paymentToken
     );
-    
-    event IPFSShared(
-        uint256 indexed purchaseId,
-        address indexed buyer,
-        string ipfsHash
-    );
-    
+
+    event IPFSShared(uint256 indexed purchaseId, address indexed buyer, string ipfsHash);
+
     event TokenAuthorized(address indexed token, bool authorized);
     event PlatformFeeUpdated(uint256 newFeeBps);
     event FeeRecipientUpdated(address newRecipient);
-    
+
     // Yield events
     event YieldStarted(uint256 indexed purchaseId, address indexed seller, uint256 amount);
     event YieldWithdrawn(address indexed seller, uint256 amount, uint256 yieldEarned);
@@ -159,7 +155,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         require(_price > 0, "Price must be greater than 0");
 
         uint256 productId = nextProductId++;
-        
+
         products[productId] = Product({
             id: productId,
             seller: msg.sender,
@@ -182,33 +178,21 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @dev Purchase a product
      * @param _productId ID of the product to purchase
      */
-    function purchaseProduct(uint256 _productId) 
-        external 
-        nonReentrant 
-        onlyValidProduct(_productId) 
-    {
+    function purchaseProduct(uint256 _productId) external nonReentrant onlyValidProduct(_productId) {
         Product storage product = products[_productId];
         require(product.seller != msg.sender, "Cannot buy your own product");
 
         uint256 purchaseId = nextPurchaseId++;
-        
+
         // Transfer payment from buyer to seller (minus platform fee)
         uint256 platformFee = (product.price * platformFeeBps) / 10000;
         uint256 sellerAmount = product.price - platformFee;
 
-        IERC20(product.paymentToken).safeTransferFrom(
-            msg.sender, 
-            product.seller, 
-            sellerAmount
-        );
+        IERC20(product.paymentToken).safeTransferFrom(msg.sender, product.seller, sellerAmount);
 
         // Transfer platform fee to fee recipient
         if (platformFee > 0) {
-            IERC20(product.paymentToken).safeTransferFrom(
-                msg.sender, 
-                feeRecipient, 
-                platformFee
-            );
+            IERC20(product.paymentToken).safeTransferFrom(msg.sender, feeRecipient, platformFee);
         }
 
         // Record the purchase
@@ -225,14 +209,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
 
         buyerPurchases[msg.sender].push(purchaseId);
 
-        emit ProductPurchased(
-            _productId, 
-            purchaseId, 
-            msg.sender, 
-            product.seller, 
-            product.price, 
-            product.paymentToken
-        );
+        emit ProductPurchased(_productId, purchaseId, msg.sender, product.seller, product.price, product.paymentToken);
     }
 
     /**
@@ -241,10 +218,10 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      */
     function shareIPFSLink(uint256 _purchaseId) external {
         require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
-        
+
         Purchase storage purchase = purchases[_purchaseId];
         Product storage product = products[purchase.productId];
-        
+
         require(product.seller == msg.sender, "Only seller can share IPFS link");
         require(!purchase.ipfsShared, "IPFS link already shared");
 
@@ -288,7 +265,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      */
     function getIPFSHash(uint256 _purchaseId) external view returns (string memory) {
         require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
-        
+
         Purchase storage purchase = purchases[_purchaseId];
         require(purchase.buyer == msg.sender, "Only buyer can access IPFS hash");
         require(purchase.ipfsShared, "IPFS link not shared yet");
@@ -302,7 +279,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      */
     function getAccessControlConditions(uint256 _purchaseId) external view returns (string memory) {
         require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
-        
+
         Purchase storage purchase = purchases[_purchaseId];
         require(purchase.buyer == msg.sender, "Only buyer can access conditions");
         require(purchase.ipfsShared, "IPFS link not shared yet");
@@ -316,10 +293,10 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      */
     function withdrawYield(uint256 _purchaseId) external nonReentrant {
         require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
-        
+
         Purchase storage purchase = purchases[_purchaseId];
         Product storage product = products[purchase.productId];
-        
+
         require(product.seller == msg.sender, "Only seller can withdraw yield");
         require(purchase.ipfsShared, "IPFS link must be shared first");
         require(!purchase.withdrawn, "Yield already withdrawn");
@@ -327,22 +304,19 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         // Redeem from yield vault to get actual yield
         uint256 totalAmount = purchase.amountPaid;
         uint256 yieldEarned = 0;
-        
+
         address vaultAddress = yieldVaults[product.paymentToken];
         if (vaultAddress != address(0) && purchaseShares[_purchaseId] > 0) {
             // Redeem shares from vault
-            uint256 redeemedAmount = IERC4626(vaultAddress).redeem(
-                purchaseShares[_purchaseId], 
-                address(this), 
-                address(this)
-            );
-            
+            uint256 redeemedAmount =
+                IERC4626(vaultAddress).redeem(purchaseShares[_purchaseId], address(this), address(this));
+
             // Calculate actual yield earned
             if (redeemedAmount > purchase.amountPaid) {
                 yieldEarned = redeemedAmount - purchase.amountPaid;
                 totalAmount = redeemedAmount;
             }
-            
+
             // Update total vault shares
             totalVaultShares -= purchaseShares[_purchaseId];
             purchaseShares[_purchaseId] = 0;
@@ -352,7 +326,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
             yieldEarned = calculateYield(purchase.amountPaid, timeElapsed);
             totalAmount = purchase.amountPaid + yieldEarned;
         }
-        
+
         // Calculate platform fee on yield
         uint256 platformYieldFee = (yieldEarned * yieldFeeBps) / 10000;
         uint256 sellerYield = yieldEarned - platformYieldFee;
@@ -388,13 +362,13 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         if (_amount == 0 || _timeElapsed == 0) {
             return 0;
         }
-        
+
         // Calculate yield: amount * annualRate * timeElapsed / (365 days * 24 hours * 3600 seconds)
         // Use higher precision to avoid rounding errors
         uint256 secondsInYear = 365 * 24 * 3600; // 31,536,000 seconds
         uint256 numerator = _amount * annualYieldRate * _timeElapsed;
         uint256 denominator = 10000 * secondsInYear;
-        
+
         // Add rounding for better precision
         return (numerator + denominator / 2) / denominator;
     }
@@ -413,7 +387,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      */
     function getPurchaseYield(uint256 _purchaseId) external view returns (uint256) {
         require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
-        
+
         Purchase storage purchase = purchases[_purchaseId];
         if (!purchase.ipfsShared || purchase.withdrawn) {
             return 0;
@@ -422,7 +396,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         uint256 timeElapsed = block.timestamp - purchase.yieldStartTime;
         uint256 yieldEarned = calculateYield(purchase.amountPaid, timeElapsed);
         uint256 platformYieldFee = (yieldEarned * yieldFeeBps) / 10000;
-        
+
         return yieldEarned - platformYieldFee;
     }
 
@@ -430,11 +404,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @dev Deactivate a product listing
      * @param _productId ID of the product to deactivate
      */
-    function deactivateProduct(uint256 _productId) 
-        external 
-        onlyValidProduct(_productId) 
-        onlySeller(_productId) 
-    {
+    function deactivateProduct(uint256 _productId) external onlyValidProduct(_productId) onlySeller(_productId) {
         products[_productId].isActive = false;
     }
 
@@ -516,7 +486,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
         if (vaultAddress == address(0)) {
             return annualYieldRate; // Return simulated rate if no vault
         }
-        
+
         try IERC4626(vaultAddress).totalAssets() returns (uint256 totalAssets) {
             try IERC4626(vaultAddress).totalSupply() returns (uint256 totalSupply) {
                 if (totalSupply > 0) {
@@ -529,7 +499,7 @@ contract ToteFlow is Ownable, ReentrancyGuard {
                 }
             } catch {}
         } catch {}
-        
+
         return annualYieldRate; // Fallback to simulated rate
     }
 
@@ -539,19 +509,23 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @param _timeElapsed Time elapsed in seconds
      * @param _token Token address for vault lookup
      */
-    function calculateRealTimeYield(uint256 _amount, uint256 _timeElapsed, address _token) public view returns (uint256) {
+    function calculateRealTimeYield(uint256 _amount, uint256 _timeElapsed, address _token)
+        public
+        view
+        returns (uint256)
+    {
         if (_amount == 0 || _timeElapsed == 0) {
             return 0;
         }
-        
+
         // Get real-time yield rate from vault
         uint256 currentRate = getCurrentYieldRate(_token);
-        
+
         // Calculate yield using real-time rate
         uint256 secondsInYear = 365 * 24 * 3600;
         uint256 numerator = _amount * currentRate * _timeElapsed;
         uint256 denominator = 10000 * secondsInYear;
-        
+
         return (numerator + denominator / 2) / denominator;
     }
 
@@ -611,23 +585,19 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @return purchase Purchase details
      * @return canAccess Whether caller can access the encrypted content
      */
-    function getProductAndPurchaseData(uint256 _purchaseId) 
-        external 
-        view 
-        returns (
-            Product memory product,
-            Purchase memory purchase,
-            bool canAccess
-        ) 
+    function getProductAndPurchaseData(uint256 _purchaseId)
+        external
+        view
+        returns (Product memory product, Purchase memory purchase, bool canAccess)
     {
         require(_purchaseId > 0 && _purchaseId < nextPurchaseId, "Invalid purchase ID");
-        
+
         purchase = purchases[_purchaseId];
         product = products[purchase.productId];
-        
+
         // Check if caller is the buyer and IPFS has been shared
         canAccess = (purchase.buyer == msg.sender && purchase.ipfsShared);
-        
+
         return (product, purchase, canAccess);
     }
 
@@ -637,15 +607,11 @@ contract ToteFlow is Ownable, ReentrancyGuard {
      * @return totalPurchases Total number of purchases
      * @return platformFee Current platform fee in basis points
      */
-    function getMarketplaceStats() external view returns (
-        uint256 totalProducts,
-        uint256 totalPurchases,
-        uint256 platformFee
-    ) {
-        return (
-            nextProductId - 1,
-            nextPurchaseId - 1,
-            platformFeeBps
-        );
+    function getMarketplaceStats()
+        external
+        view
+        returns (uint256 totalProducts, uint256 totalPurchases, uint256 platformFee)
+    {
+        return (nextProductId - 1, nextPurchaseId - 1, platformFeeBps);
     }
 }
